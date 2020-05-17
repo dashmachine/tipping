@@ -1,0 +1,192 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+
+<head>
+
+  <meta content="text/html; charset=utf-8" http-equiv="content-type">
+  <title>Send to Dash Username</title>
+  <script>
+    /*
+    Copyright 2020 @cloudwheels, Nigel Wheeler
+    Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+    The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+    */
+  </script>
+
+  <script src="https://unpkg.com/dash"></script>
+  <script src="https://unpkg.com/@dashevo/wallet-lib"></script>
+  <script src="https://unpkg.com/localforage"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/axios/0.19.2/axios.min.js"></script>
+  <script src="https://code.jquery.com/jquery-3.4.1.js"></script>
+  <link rel="stylesheet" type="text/css" href="./styles.css">
+  <script src="buffer.js"></script>
+  <script src="./main.js"></script>
+  <script>
+    $(document).ready(function () {
+
+      // ? use local storgae
+      // const wallet = new Wallet({adapter: localforage});
+
+
+      $("#submit").click(async function () {
+
+        try {
+
+          $("#result").html("");
+
+          var mnemonic, senderUsername, recipientUsername
+          if (!$("#mnemonic").val()) { mnemonic = $("#mnemonic").attr('placeholder') } else { mnemonic = $("#mnemonic").val() }
+          if (!$("#senderName").val()) { senderUsername = $("#senderName").attr('placeholder') } else { senderUsername = $("#senderName").val() }
+          if (!$("#recipientName").val()) { recipientUsername = $("#recipientName").attr('placeholder') } else { recipientUsername = $("#recipientName").val() }
+
+
+
+          
+
+          // (async () => {
+          //client.isReady().then(async () => {
+            await connect(mnemonic);
+
+            $("#result").append(`Get address for sender ${senderUsername}<br/>`);
+            const senderAddress = await getUserAddress(senderUsername);
+            $("#result").append('senderAddress:', "<a href='http://insight.evonet.networks.dash.org:3001/insight/address/"+ senderAddress +"'>"+senderAddress+"</a>", '<br/>')
+
+            $("#result").append(`Get address for recipient ${recipientUsername}<br/>`);
+            const recipientAddress = await getUserAddress(recipientUsername);
+            $("#result").append('recipientAddress:', "<a href='http://insight.evonet.networks.dash.org:3001/insight/address/"+ recipientAddress +"'>"+recipientAddress+"</a>", '<br/>');
+
+            //getSendersPrivateKey     
+            const senderIdentityPrivateKey = await getPrivateKey(); 
+            console.log('senderIdentityPrivateKey: ', senderIdentityPrivateKey);
+            $("#result").append('senderIdentityPrivateKey:  (see console)<br/>')
+
+           
+
+
+            //fund the sender address from the faucet
+            $("#result").append('funds senders tipping wallet', '<br/>')
+            fundAccountSuccess = await fundAccount(faucetURL, senderAddress, 50000);
+            $("#result").append('result', fundAccountSuccess, '<br/>')
+            //set a timeout whilst funds confirm
+            let wait = (ms) => new Promise((r, j) => setTimeout(r, ms));
+            await wait(4000);
+
+            //send  to recipient
+            const txId = await sendUsingWalletLib(senderIdentityPrivateKey, recipientAddress);
+
+            $("#result").append('resolve sending address to name(s)', '<br/>')
+            //recipient looks up names associated with the address
+            const matchingNames = await getSenderFromAddress(senderAddress)
+
+          //})
+          // })()
+
+        } catch (e) {
+          //$("#result").html("Error:<br/> " + e)
+          $("#result").append("<div>Error:<br/> " + JSON.stringify(e) +"</div>");
+        }
+
+      });
+
+    });
+  </script>
+
+</head>
+
+<body>
+  <h1>Send Dash to Username</h1>
+  <div>
+    <p>
+      <a href="https://github.com/cloudwheels/dash-send-to-user">https://github.com/cloudwheels/dash-send-to-user</a>
+    </p>
+  </div>
+  <div>
+    <p>
+      An experiment in sending Dash evonet funds between public keyhash addresses associated with usernames.
+    </p>
+    <h2>Instructions for use</h2>
+    <p>
+      This is an experiment using the Dash Platform testnet (Evonet). This example contains potentially insecure
+      transactions. Do not use real credentials! Create test users for the example or use those provided as
+      placeholders.</p>
+    <p>
+    <ul>
+      <li>Enter the username of the sender and the mnemonic associated with their account.</li>
+      <li>Enter the username of the recipient.
+      <li>Click on "Pay User" to start the process</li>
+    </ul>
+    </p>
+    <h2>What's happening?</h2>
+    <p>
+    <ul>
+      <li>
+        <b>Get senders's "tipping address" from their username:</b> The identity assciated with the sender's username is
+        retrieved and a public
+        keyhash address is derived from the public key asscoiated with that identity.
+      </li>
+      <li>
+        <b>Get recipient's "tipping address" from their username:</b> As above.
+      </li>
+      <li>
+        <b>Fund the sender's tipping address:</b> A small amount of eDash is claimed from the automated faucet.
+      </li>
+      <li>
+        <b>Access sender's account:</b> Obtain private key from the sender's mnemonic and retrieve the 'tipping' account
+        in a wallet.
+      </li>
+      <li>
+        <b>Get UTXOs for sender's address:</b> UTXOs are retrieved from insight (calling getBalance on the account using
+        wallet-lib does not return a balance)
+      </li>
+      <li>
+        <b>Create transaction to pay recpient:</b> Use the sender's availbale UTXOs to send to the recipient's "tipping
+        address" (change is simply returned to the sender's tipping address)
+      </li>
+      <li>
+        <b>[Check recipient's address for balance:</b> Currently skipped for simplicity - we know from the faucet tx
+        that it is possible to receive funds to a tipping address]
+      </li>
+      <li>
+        <b>Resolve address to username(s):</b> The DPNS contract is queried by mapping name owner idenityIds to public
+        key hashes, to find a match for the sender's address. <b>Note - this may match an array of users as multiple
+          names can be registered per identity.</b>
+      </li>
+
+    </ul>
+    </p>
+    <p>
+      Please monitor the console for errors and try again if it doesn't
+      work! Only smoke-tested in Chrome Browser
+    </p>
+  </div>
+
+  <div>
+    <form>
+      <div>
+        <label for="senderName">Sender's Username</label><br /><input type="text" id="senderName" placeholder="sender" />
+        <br />
+        <label for="mnemonic">Sender's Mnemonic</label><br />
+        <textarea style="height:100px;width:150px"
+          placeholder="swap funny purpose quiz wise device notable address sibling snap install chuckle"
+          id="mnemonic"></textarea>
+        <br />
+        <label for="recipientName">Recipient's Username</label><br /> <input type="text" id="recipientName"
+          placeholder="receiver" />
+        <br />
+        <input type="button" value="PAY USER" id="submit" />
+
+      </div>
+    </form>
+  </div>
+
+  <h2>Results:</h2>
+  <div id="result">
+
+  </div>
+  <br /><br />
+  <hr />
+
+</body>
+
+</html>
