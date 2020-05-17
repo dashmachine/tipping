@@ -2,7 +2,7 @@
 
 An experiment in sending Dash evonet funds between public keyhash addresses associated with usernames.
 
-[Run example in Browser](tipping.dashmachine.net)
+[Run example in Browser](http://tipping.dashmachine.net)
 
 ## Instructions for use
 
